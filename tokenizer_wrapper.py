@@ -9,6 +9,26 @@ from transformers import GPT2Tokenizer
 class TokenizerWrapper:
     def __init__(self, dataset_csv_file, class_name, max_caption_length, tokenizer_num_words=None):
         dataset_df = pd.read_csv(dataset_csv_file)
+
+        # --- FIX START ---
+        # If the expected column (e.g., "Report") doesn't exist,
+        # automatically combine available ones like Findings + Impression + Caption.
+        if class_name not in dataset_df.columns:
+            if "Findings" in dataset_df.columns and "Impression" in dataset_df.columns:
+                dataset_df["Report"] = dataset_df["Findings"].fillna('') + " " + dataset_df["Impression"].fillna('')
+                class_name = "Report"
+            elif "Findings" in dataset_df.columns:
+                dataset_df["Report"] = dataset_df["Findings"].fillna('')
+                class_name = "Report"
+            elif "Caption" in dataset_df.columns:
+                dataset_df["Report"] = dataset_df["Caption"].fillna('')
+                class_name = "Report"
+            else:
+                raise ValueError(
+                    f"No suitable text column found in CSV. Available columns: {list(dataset_df.columns)}"
+                )
+        # --- FIX END ---
+
         sentences = dataset_df[class_name].tolist()
         self.max_caption_length = max_caption_length
         self.tokenizer_num_words = tokenizer_num_words
@@ -93,11 +113,9 @@ class TokenizerWrapper:
                 return sentence
             if word != 'startseq':
                 sentence.append(word)
-
         return sentence
 
     def get_string_from_word_list(self, word_list):
-
         return " ".join(word_list)
 
     def get_word_tokens_list(self):
