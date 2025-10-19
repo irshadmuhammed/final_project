@@ -10,3 +10,4 @@ train_output_captions/
 test_output_captions/
 .vs/
 output_images/
+venv/
