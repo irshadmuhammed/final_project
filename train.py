@@ -13,7 +13,10 @@ from gpt2.gpt2_model import TFGPT2LMHeadModel
 from test import evaluate_enqueuer
 import pandas as pd
 from glob import glob
+import pandas as pd
+from glob import glob
 import shutil
+from losses import AsymmetricLoss
 
 # tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
 
@@ -49,6 +52,8 @@ optimizer = get_optimizer(FLAGS.optimizer_type, FLAGS.learning_rate)
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
     from_logits=True, reduction='none')
 
+asl_loss_object = AsymmetricLoss(gamma_neg=4.0, gamma_pos=1.0, clip=0.05, eps=1e-8, from_logits=False)
+
 
 def loss_function(real, pred):
     mask = tf.math.logical_not(tf.math.equal(real, tokenizer_wrapper.GPT2_pad_token_id()))
@@ -66,19 +71,29 @@ loss_plot = []
 #
 @tf.function
 def train_step(images, target, test_mode=False):
+    captions, tags = target
     with tf.GradientTape() as tape:
-        visual_features, tags_embeddings = encoder(images)
-        dec_input = target[:, 0:-1]
+        visual_features, tags_embeddings, tags_predictions = encoder(images)
+        dec_input = captions[:, 0:-1]
 
         # passing the features through the decoder
+        # visual_features: (batch, regions, embed_dim)
+        # tags_embeddings: (batch, num_tags, embed_dim)
         predictions, _ = decoder(dec_input, visual_features=visual_features, tags_embeddings=tags_embeddings, past=None)
 
-        loss = loss_function(target[:, 1:], predictions)
+        caption_loss = loss_function(captions[:, 1:], predictions)
+        
+        # ASL Loss
+        # tags_predictions: (batch, num_tags), tags: (batch, num_tags)
+        tag_loss = tf.reduce_mean(asl_loss_object(tags, tags_predictions))
+        
+        total_loss = caption_loss + tag_loss
+
     if not test_mode:
         trainable_variables = encoder.trainable_variables + decoder.trainable_variables
-        gradients = tape.gradient(loss, trainable_variables)
+        gradients = tape.gradient(total_loss, trainable_variables)
         optimizer.apply_gradients(zip(gradients, trainable_variables))
-    return loss
+    return total_loss
 
 
 ckpt = tf.train.Checkpoint(encoder=encoder,

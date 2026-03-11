@@ -19,6 +19,8 @@ def get_enqueuer(csv,batch_size, FLAGS, tokenizer_wrapper, augmenter=None):
         target_size=FLAGS.image_target_size,
         augmenter=augmenter,
         shuffle_on_epoch_end=True,
+        tags_list=FLAGS.tags,
+        tags_column='Manual Tags' # Assuming this is consistent
     )
     enqueuer = OrderedEnqueuer(data_generator,
                                use_multiprocessing=False,

@@ -40,7 +40,8 @@ step_n = 1
 
 def evaluate_full(FLAGS, encoder, decoder, tokenizer_wrapper, images):
     global avg_time, step_n
-    visual_features, tags_embeddings = encoder(images)
+    # Encoder now returns predictions as well
+    visual_features, tags_embeddings, _ = encoder(images)
     dec_input = tf.expand_dims(tokenizer_wrapper.GPT2_encode("startseq", pad=False), 0)
     # dec_input = tf.tile(dec_input,[images.shape[0],1])
     num_beams = FLAGS.beam_width
@@ -117,7 +118,10 @@ def evaluate_enqueuer(enqueuer, steps, FLAGS, encoder, decoder, tokenizer_wrappe
                                            images)
         csv_dict["prediction"].append(predicted_sentence)
         csv_dict["image_path"].append(os.path.basename(img_path[0]))
-        target_sentence = tokenizer_wrapper.GPT2_decode(target[0])
+        
+        # Unpack target (captions, tags)
+        captions, tags = target
+        target_sentence = tokenizer_wrapper.GPT2_decode(captions[0])
         target_sentence = tokenizer_wrapper.filter_special_words(target_sentence)
         csv_dict["real"].append(target_sentence)
         target_word_list = tokenizer_wrapper.GPT2_format_output(target_sentence)

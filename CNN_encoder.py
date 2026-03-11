@@ -44,4 +44,4 @@ class CNN_Encoder(tf.keras.Model):
             visual_features = layer(visual_features)
             if tags_embed is not None:
                 tags_embed = layer(tags_embed)
-        return visual_features, tags_embed
+        return visual_features, tags_embed, tags_predictions
